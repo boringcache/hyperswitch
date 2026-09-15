@@ -149,8 +149,13 @@ jobs:
         with:
           ref: boringcache-validation
           path: .boringcache-validation-plan
-          sparse-checkout: .github/boringcache-plans/push-msrv
+          sparse-checkout: .github/boringcache-plans/push-msrv/.boringcache.toml
+          sparse-checkout-cone-mode: false
           persist-credentials: false
+
+      - name: Select the BoringCache MSRV publisher plan
+        if: github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
+        run: cp .boringcache-validation-plan/.github/boringcache-plans/push-msrv/.boringcache.toml .boringcache.toml
 
       - name: Cargo hack
         if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
@@ -166,9 +171,7 @@ jobs:
         if: always() && github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
         uses: boringcache/one@1039999c65011be670f5655e0e48ad556188ab12 # v1.30.4
         with:
-          setup: none
           mode: cargo
-          working-directory: .boringcache-validation-plan/.github/boringcache-plans/push-msrv
           trust-policy: publish
           diagnostics: summary
           fail-on-cache-error: true
@@ -279,8 +282,13 @@ jobs:
         with:
           ref: boringcache-validation
           path: .boringcache-validation-plan
-          sparse-checkout: .github/boringcache-plans/push-stable-v1
+          sparse-checkout: .github/boringcache-plans/push-stable-v1/.boringcache.toml
+          sparse-checkout-cone-mode: false
           persist-credentials: false
+
+      - name: Select the BoringCache stable-v1 publisher plan
+        if: github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
+        run: cp .boringcache-validation-plan/.github/boringcache-plans/push-stable-v1/.boringcache.toml .boringcache.toml
 
       - name: Run clippy (redis-rs backend)
         shell: bash
@@ -314,9 +322,7 @@ jobs:
           CARGO_BUILD_JOBS: 2
         uses: boringcache/one@1039999c65011be670f5655e0e48ad556188ab12 # v1.30.4
         with:
-          setup: none
           mode: cargo
-          working-directory: .boringcache-validation-plan/.github/boringcache-plans/push-stable-v1
           trust-policy: publish
           diagnostics: summary
           fail-on-cache-error: true
@@ -416,8 +422,13 @@ jobs:
         with:
           ref: boringcache-validation
           path: .boringcache-validation-plan
-          sparse-checkout: .github/boringcache-plans/push-stable-v2
+          sparse-checkout: .github/boringcache-plans/push-stable-v2/.boringcache.toml
+          sparse-checkout-cone-mode: false
           persist-credentials: false
+
+      - name: Select the BoringCache stable-v2 publisher plan
+        if: github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
+        run: cp .boringcache-validation-plan/.github/boringcache-plans/push-stable-v2/.boringcache.toml .boringcache.toml
 
       - name: Run cargo check enabling only the release and v2 features (redis-rs backend)
         shell: bash
@@ -433,9 +444,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
         uses: boringcache/one@1039999c65011be670f5655e0e48ad556188ab12 # v1.30.4
         with:
-          setup: none
           mode: cargo
-          working-directory: .boringcache-validation-plan/.github/boringcache-plans/push-stable-v2
           trust-policy: publish
           diagnostics: summary
           fail-on-cache-error: true
