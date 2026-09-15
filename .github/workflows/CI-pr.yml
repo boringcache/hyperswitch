@@ -163,7 +163,9 @@ jobs:
 
       - name: Select the BoringCache MSRV restore plan
         if: github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
-        run: cp .boringcache-validation-plan/.github/boringcache-plans/pr-msrv/.boringcache.toml .boringcache.toml
+        run: |
+          cp .boringcache-validation-plan/.github/boringcache-plans/pr-msrv/.boringcache.toml .boringcache.toml
+          printf '%s\n' '/.boringcache.toml' '/.boringcache-validation-plan/' >> .git/info/exclude
 
       - name: Run cargo check
         if: github.event_name != 'workflow_dispatch' || inputs.cache_provider == 'github'
@@ -270,7 +272,9 @@ jobs:
 
       - name: Select the BoringCache stable-v1 restore plan
         if: github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
-        run: cp .boringcache-validation-plan/.github/boringcache-plans/pr-stable-v1/.boringcache.toml .boringcache.toml
+        run: |
+          cp .boringcache-validation-plan/.github/boringcache-plans/pr-stable-v1/.boringcache.toml .boringcache.toml
+          printf '%s\n' '/.boringcache.toml' '/.boringcache-validation-plan/' >> .git/info/exclude
 
       - name: Run cargo check
         if: github.event_name != 'workflow_dispatch' || inputs.cache_provider == 'github'
@@ -411,7 +415,9 @@ jobs:
 
       - name: Select the BoringCache stable-v2 restore plan
         if: github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
-        run: cp .boringcache-validation-plan/.github/boringcache-plans/pr-stable-v2/.boringcache.toml .boringcache.toml
+        run: |
+          cp .boringcache-validation-plan/.github/boringcache-plans/pr-stable-v2/.boringcache.toml .boringcache.toml
+          printf '%s\n' '/.boringcache.toml' '/.boringcache-validation-plan/' >> .git/info/exclude
 
       - name: Run cargo check enabling only the release and v2 features (redis-rs backend)
         if: github.event_name != 'workflow_dispatch' || inputs.cache_provider == 'github'
