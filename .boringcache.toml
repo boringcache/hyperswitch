@@ -1,0 +1,60 @@
+workspace = "boringcache/hyperswitch"
+
+[proxy]
+metadata-hints = ["project=hyperswitch", "experiment=issue-14195"]
+
+[entries.cargo-target]
+kind = "cargo-target"
+
+[profiles.cargo]
+entries = [
+    "cargo-registry-cache",
+    "cargo-registry-index",
+    "cargo-git-db",
+    "cargo-target",
+]
+
+[profiles.cargo-deps]
+entries = [
+    "cargo-registry-cache",
+    "cargo-registry-index",
+    "cargo-git-db",
+]
+
+[profiles.cargo-target]
+entries = ["cargo-target"]
+
+[adapters.cargo]
+no-platform = false
+no-git = false
+read-only = false
+fail-on-cache-error = false
+profiles = ["cargo"]
+skip-restore = false
+skip-save = false
+save-on-failure = false
+mount-cache = false
+
+[adapters.nix]
+tag = "nix"
+no-platform = false
+no-git = false
+read-only = false
+fail-on-cache-error = false
+skip-restore = false
+skip-save = false
+save-on-failure = false
+mount-cache = false
+
+[adapters.sccache]
+tag = "hyperswitch-msrv-sccache"
+command = ["cargo", "check", "--features", "release"]
+metadata-hints = ["tool=sccache", "lane=check-msrv"]
+no-platform = false
+no-git = false
+read-only = false
+fail-on-cache-error = false
+skip-restore = false
+skip-save = false
+save-on-failure = false
+mount-cache = false
