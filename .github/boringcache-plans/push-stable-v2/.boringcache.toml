@@ -1,0 +1,28 @@
+workspace = "boringcache/hyperswitch"
+
+[proxy]
+metadata-hints = ["project=hyperswitch", "issue=14195", "workflow=ci-push", "lane=stable-v2"]
+
+[entries.cargo-registry-cache]
+tag = "hyperswitch-stable-v2-registry-cache"
+
+[entries.cargo-registry-index]
+tag = "hyperswitch-stable-v2-registry-index"
+
+[entries.cargo-git-db]
+tag = "hyperswitch-stable-v2-git-db"
+
+[entries.cargo-target]
+kind = "cargo-target"
+tag = "hyperswitch-stable-v2-target"
+
+[profiles.cargo]
+entries = ["cargo-registry-cache", "cargo-registry-index", "cargo-git-db", "cargo-target"]
+
+[adapters.cargo]
+tag = "hyperswitch-stable-v2-cargo"
+profiles = ["cargo"]
+command = ["cargo", "check", "--no-default-features", "--features", "release,v2,fred"]
+compiler-cache = "none"
+save-on-failure = true
+fail-on-cache-error = true

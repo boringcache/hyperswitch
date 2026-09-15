@@ -9,8 +9,26 @@ on:
     types:
       - checks_requested
 
+  workflow_dispatch:
+    inputs:
+      cache_provider:
+        description: Cache implementation used by the three Rust jobs from issue 14195
+        type: choice
+        options:
+          - github
+          - boringcache
+        default: github
+      source_ref:
+        description: Exact Hyperswitch commit to build
+        type: string
+        required: true
+        default: d8b6ebe773690aa37cf249b2992c2358dbd7f438
+
+permissions:
+  contents: read
+
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.cache_provider || 'upstream' }}-${{ inputs.source_ref || github.sha }}
   cancel-in-progress: true
 
 env:
@@ -37,6 +55,7 @@ env:
 jobs:
   formatting:
     name: Check formatting
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -55,6 +74,10 @@ jobs:
   check-msrv:
     name: Check compilation on MSRV toolchain
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      id-token: write
 
     env:
       RUSTFLAGS: "-D warnings"
@@ -67,10 +90,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.sha }}
+          persist-credentials: false
 
       - name: Install mold linker
-        uses: rui314/setup-mold@v1
+        uses: rui314/setup-mold@7e4f20ad28a2e8ca6fd0892ccf72e2abb706b9c3 # v1
         if: ${{ runner.os == 'Linux' }}
         with:
           make-default: true
@@ -82,32 +108,33 @@ jobs:
           echo "rust_version=${rust_version}" >> $GITHUB_ENV
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
         with:
           toolchain: "${{ env.rust_version }}"
 
       - name: Install Protoc
-        uses: arduino/setup-protoc@v3
+        uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3.0.0
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install rust cache
-        uses: Swatinem/rust-cache@v2.9.1
+        if: github.event_name != 'workflow_dispatch' || inputs.cache_provider == 'github'
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           shared-key: msrv
-          save-if: ${{ github.event_name == 'push' }}
+          save-if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
           # `Cargo hack` currently fails on main; without this the post-step is
           # skipped (post-if: success()) and no cache is ever saved for PRs to restore.
           cache-on-failure: true
 
       - name: Install cargo-hack
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@26e9283f268b880168bdbd2c545dfcd60ec2c6ab # v2
         with:
           tool: cargo-hack
           checksum: true
 
       - name: Install just
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@26e9283f268b880168bdbd2c545dfcd60ec2c6ab # v2
         with:
           tool: just
           checksum: true
@@ -116,10 +143,44 @@ jobs:
         shell: bash
         run: .github/scripts/install-jq.sh
 
+      - name: Checkout the BoringCache MSRV publisher plan
+        if: github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: boringcache-validation
+          path: .boringcache-validation-plan
+          sparse-checkout: .github/boringcache-plans/push-msrv
+          persist-credentials: false
+
       - name: Cargo hack
-        if: ${{ github.event_name == 'push' }}
+        if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
         shell: bash
         run: just ci_hack
+
+      - name: Finalize GitHub Cargo state
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'github'
+        run: cargo check --features "release"
+
+      - name: Finalize BoringCache Cargo state
+        id: boringcache
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
+        uses: boringcache/one@1039999c65011be670f5655e0e48ad556188ab12 # v1.30.4
+        with:
+          setup: none
+          mode: cargo
+          working-directory: .boringcache-validation-plan/.github/boringcache-plans/push-msrv
+          trust-policy: publish
+          diagnostics: summary
+          fail-on-cache-error: true
+
+      - name: Retain BoringCache evidence
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hyperswitch-push-msrv-${{ inputs.source_ref }}
+          path: ${{ steps.boringcache.outputs.evidence-path }}
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Cargo build release
         if: ${{ github.event_name == 'merge_group' }}
@@ -149,47 +210,55 @@ jobs:
 
   test:
     name: Run tests on stable toolchain
-    runs-on: hyperswitch-runners-merge
+    runs-on: ${{ github.event_name == 'workflow_dispatch' && 'ubuntu-24.04-arm' || 'hyperswitch-runners-merge' }}
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      id-token: write
 
     env:
       RUSTFLAGS: "-D warnings"
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.sha }}
+          persist-credentials: false
 
       - name: Install mold linker
-        uses: rui314/setup-mold@v1
+        uses: rui314/setup-mold@7e4f20ad28a2e8ca6fd0892ccf72e2abb706b9c3 # v1
         if: ${{ runner.os == 'Linux' }}
         with:
           make-default: true
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
         with:
           toolchain: stable 2 weeks ago
           components: clippy
 
       - name: Install Protoc
-        uses: arduino/setup-protoc@v3
+        uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3.0.0
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install rust cache
-        uses: Swatinem/rust-cache@v2.9.1
+        if: github.event_name != 'workflow_dispatch' || inputs.cache_provider == 'github'
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           shared-key: stable-v1
-          save-if: ${{ github.event_name == 'push' }}
+          save-if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
           cache-on-failure: true
 
       - name: Install cargo-hack
-        uses: taiki-e/install-action@v2.83.2
+        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2.83.2
         with:
           tool: cargo-hack
           checksum: true
 
       - name: Install just
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@26e9283f268b880168bdbd2c545dfcd60ec2c6ab # v2
         with:
           tool: just
           checksum: true
@@ -204,6 +273,15 @@ jobs:
       #     tool: cargo-nextest
       #     checksum: true
 
+      - name: Checkout the BoringCache stable-v1 publisher plan
+        if: github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: boringcache-validation
+          path: .boringcache-validation-plan
+          sparse-checkout: .github/boringcache-plans/push-stable-v1
+          persist-credentials: false
+
       - name: Run clippy (redis-rs backend)
         shell: bash
         env:
@@ -217,11 +295,40 @@ jobs:
         run: just clippy fred
 
       - name: Cargo hack
-        if: ${{ github.event_name == 'push' }}
+        if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
         shell: bash
         env:
           CARGO_BUILD_JOBS: 2
         run: just ci_hack
+
+      - name: Finalize GitHub Cargo state
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'github'
+        env:
+          CARGO_BUILD_JOBS: 2
+        run: cargo check --features "release"
+
+      - name: Finalize BoringCache Cargo state
+        id: boringcache
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
+        env:
+          CARGO_BUILD_JOBS: 2
+        uses: boringcache/one@1039999c65011be670f5655e0e48ad556188ab12 # v1.30.4
+        with:
+          setup: none
+          mode: cargo
+          working-directory: .boringcache-validation-plan/.github/boringcache-plans/push-stable-v1
+          trust-policy: publish
+          diagnostics: summary
+          fail-on-cache-error: true
+
+      - name: Retain BoringCache evidence
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hyperswitch-push-stable-v1-${{ inputs.source_ref }}
+          path: ${{ steps.boringcache.outputs.evidence-path }}
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Cargo build release
         if: ${{ github.event_name == 'merge_group' }}
@@ -232,6 +339,7 @@ jobs:
 
   typos:
     name: Spell check
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -242,6 +350,7 @@ jobs:
 
   typos-required:
     name: Spell check specific critical directories
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -264,39 +373,78 @@ jobs:
 
   check-v2:
     name: Check compilation for V2 features
-    runs-on: hyperswitch-runners-merge
+    runs-on: ${{ github.event_name == 'workflow_dispatch' && 'ubuntu-24.04-arm' || 'hyperswitch-runners-merge' }}
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.sha }}
+          persist-credentials: false
 
       - name: Install mold linker
-        uses: rui314/setup-mold@v1
+        uses: rui314/setup-mold@7e4f20ad28a2e8ca6fd0892ccf72e2abb706b9c3 # v1
         if: ${{ runner.os == 'Linux' }}
         with:
           make-default: true
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
         with:
           toolchain: stable 2 weeks ago
 
       - name: Install Protoc
-        uses: arduino/setup-protoc@v3
+        uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3.0.0
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install rust cache
-        uses: Swatinem/rust-cache@v2.9.1
+        if: github.event_name != 'workflow_dispatch' || inputs.cache_provider == 'github'
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           shared-key: stable-v2
-          save-if: ${{ github.event_name == 'push' }}
+          save-if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
           cache-on-failure: true
+
+      - name: Checkout the BoringCache stable-v2 publisher plan
+        if: github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: boringcache-validation
+          path: .boringcache-validation-plan
+          sparse-checkout: .github/boringcache-plans/push-stable-v2
+          persist-credentials: false
 
       - name: Run cargo check enabling only the release and v2 features (redis-rs backend)
         shell: bash
         run: cargo check --no-default-features --features "release,v2,redis-rs"
 
       - name: Run cargo check enabling only the release and v2 features (fred backend)
+        if: github.event_name != 'workflow_dispatch' || inputs.cache_provider == 'github'
         shell: bash
         run: cargo check --no-default-features --features "release,v2,fred"
+
+      - name: Run stable-v2 checks with BoringCache
+        id: boringcache
+        if: github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
+        uses: boringcache/one@1039999c65011be670f5655e0e48ad556188ab12 # v1.30.4
+        with:
+          setup: none
+          mode: cargo
+          working-directory: .boringcache-validation-plan/.github/boringcache-plans/push-stable-v2
+          trust-policy: publish
+          diagnostics: summary
+          fail-on-cache-error: true
+
+      - name: Retain BoringCache evidence
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hyperswitch-push-stable-v2-${{ inputs.source_ref }}
+          path: ${{ steps.boringcache.outputs.evidence-path }}
+          if-no-files-found: error
+          retention-days: 30
