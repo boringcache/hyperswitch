@@ -148,7 +148,7 @@ jobs:
         if: github.event_name != 'workflow_dispatch' || inputs.cache_provider == 'github'
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          shared-key: msrv
+          shared-key: validation-v2-msrv
           save-if: false
 
       - name: Checkout the BoringCache MSRV restore plan
@@ -251,7 +251,7 @@ jobs:
         if: github.event_name != 'workflow_dispatch' || inputs.cache_provider == 'github'
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          shared-key: stable-v1
+          shared-key: validation-v2-stable-v1
           save-if: false
 
       - name: Install just
@@ -394,7 +394,7 @@ jobs:
         if: github.event_name != 'workflow_dispatch' || inputs.cache_provider == 'github'
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          shared-key: stable-v2
+          shared-key: validation-v2-stable-v2
           save-if: false
 
       - name: Install just

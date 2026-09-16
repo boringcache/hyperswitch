@@ -121,7 +121,7 @@ jobs:
         if: github.event_name != 'workflow_dispatch' || inputs.cache_provider == 'github'
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          shared-key: msrv
+          shared-key: validation-v2-msrv
           save-if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
           # `Cargo hack` currently fails on main; without this the post-step is
           # skipped (post-if: success()) and no cache is ever saved for PRs to restore.
@@ -143,21 +143,32 @@ jobs:
         shell: bash
         run: .github/scripts/install-jq.sh
 
-      - name: Checkout the BoringCache MSRV publisher plan
+      - name: Checkout the BoringCache MSRV plans
         if: github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: boringcache-validation
           path: .boringcache-validation-plan
-          sparse-checkout: .github/boringcache-plans/push-msrv/.boringcache.toml
+          sparse-checkout: |
+            .github/boringcache-plans/pr-msrv/.boringcache.toml
+            .github/boringcache-plans/push-msrv/.boringcache.toml
           sparse-checkout-cone-mode: false
           persist-credentials: false
 
-      - name: Select the BoringCache MSRV publisher plan
+      - name: Select the BoringCache MSRV restore plan
         if: github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
         run: |
-          cp .boringcache-validation-plan/.github/boringcache-plans/push-msrv/.boringcache.toml .boringcache.toml
+          cp .boringcache-validation-plan/.github/boringcache-plans/pr-msrv/.boringcache.toml .boringcache.toml
           printf '%s\n' '/.boringcache.toml' '/.boringcache-validation-plan/' >> .git/info/exclude
+
+      - name: Restore BoringCache MSRV Cargo state
+        if: github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
+        uses: boringcache/one@1039999c65011be670f5655e0e48ad556188ab12 # v1.30.4
+        with:
+          mode: cargo
+          trust-policy: restore
+          diagnostics: summary
+          fail-on-cache-error: true
 
       - name: Cargo hack
         if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
@@ -167,6 +178,10 @@ jobs:
       - name: Finalize GitHub Cargo state
         if: always() && github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'github'
         run: cargo check --features "release"
+
+      - name: Select the BoringCache MSRV publisher plan
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
+        run: cp .boringcache-validation-plan/.github/boringcache-plans/push-msrv/.boringcache.toml .boringcache.toml
 
       - name: Finalize BoringCache Cargo state
         id: boringcache
@@ -252,7 +267,7 @@ jobs:
         if: github.event_name != 'workflow_dispatch' || inputs.cache_provider == 'github'
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          shared-key: stable-v1
+          shared-key: validation-v2-stable-v1
           save-if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
           cache-on-failure: true
 
@@ -278,21 +293,34 @@ jobs:
       #     tool: cargo-nextest
       #     checksum: true
 
-      - name: Checkout the BoringCache stable-v1 publisher plan
+      - name: Checkout the BoringCache stable-v1 plans
         if: github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: boringcache-validation
           path: .boringcache-validation-plan
-          sparse-checkout: .github/boringcache-plans/push-stable-v1/.boringcache.toml
+          sparse-checkout: |
+            .github/boringcache-plans/pr-stable-v1/.boringcache.toml
+            .github/boringcache-plans/push-stable-v1/.boringcache.toml
           sparse-checkout-cone-mode: false
           persist-credentials: false
 
-      - name: Select the BoringCache stable-v1 publisher plan
+      - name: Select the BoringCache stable-v1 restore plan
         if: github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
         run: |
-          cp .boringcache-validation-plan/.github/boringcache-plans/push-stable-v1/.boringcache.toml .boringcache.toml
+          cp .boringcache-validation-plan/.github/boringcache-plans/pr-stable-v1/.boringcache.toml .boringcache.toml
           printf '%s\n' '/.boringcache.toml' '/.boringcache-validation-plan/' >> .git/info/exclude
+
+      - name: Restore BoringCache stable-v1 Cargo state
+        if: github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
+        env:
+          CARGO_BUILD_JOBS: 2
+        uses: boringcache/one@1039999c65011be670f5655e0e48ad556188ab12 # v1.30.4
+        with:
+          mode: cargo
+          trust-policy: restore
+          diagnostics: summary
+          fail-on-cache-error: true
 
       - name: Run clippy (redis-rs backend)
         shell: bash
@@ -318,6 +346,10 @@ jobs:
         env:
           CARGO_BUILD_JOBS: 2
         run: cargo check --features "release"
+
+      - name: Select the BoringCache stable-v1 publisher plan
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
+        run: cp .boringcache-validation-plan/.github/boringcache-plans/push-stable-v1/.boringcache.toml .boringcache.toml
 
       - name: Finalize BoringCache Cargo state
         id: boringcache
@@ -416,27 +448,39 @@ jobs:
         if: github.event_name != 'workflow_dispatch' || inputs.cache_provider == 'github'
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          shared-key: stable-v2
+          shared-key: validation-v2-stable-v2
           save-if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
           cache-on-failure: true
 
-      - name: Checkout the BoringCache stable-v2 publisher plan
+      - name: Checkout the BoringCache stable-v2 plans
         if: github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: boringcache-validation
           path: .boringcache-validation-plan
-          sparse-checkout: .github/boringcache-plans/push-stable-v2/.boringcache.toml
+          sparse-checkout: |
+            .github/boringcache-plans/pr-stable-v2/.boringcache.toml
+            .github/boringcache-plans/push-stable-v2/.boringcache.toml
           sparse-checkout-cone-mode: false
           persist-credentials: false
 
-      - name: Select the BoringCache stable-v2 publisher plan
+      - name: Select the BoringCache stable-v2 restore plan
         if: github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
         run: |
-          cp .boringcache-validation-plan/.github/boringcache-plans/push-stable-v2/.boringcache.toml .boringcache.toml
+          cp .boringcache-validation-plan/.github/boringcache-plans/pr-stable-v2/.boringcache.toml .boringcache.toml
           printf '%s\n' '/.boringcache.toml' '/.boringcache-validation-plan/' >> .git/info/exclude
 
+      - name: Restore BoringCache stable-v2 Cargo state
+        if: github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
+        uses: boringcache/one@1039999c65011be670f5655e0e48ad556188ab12 # v1.30.4
+        with:
+          mode: cargo
+          trust-policy: restore
+          diagnostics: summary
+          fail-on-cache-error: true
+
       - name: Run cargo check enabling only the release and v2 features (redis-rs backend)
+        if: github.event_name != 'workflow_dispatch' || inputs.cache_provider == 'github'
         shell: bash
         run: cargo check --no-default-features --features "release,v2,redis-rs"
 
@@ -444,6 +488,10 @@ jobs:
         if: github.event_name != 'workflow_dispatch' || inputs.cache_provider == 'github'
         shell: bash
         run: cargo check --no-default-features --features "release,v2,fred"
+
+      - name: Select the BoringCache stable-v2 publisher plan
+        if: github.event_name == 'workflow_dispatch' && inputs.cache_provider == 'boringcache'
+        run: cp .boringcache-validation-plan/.github/boringcache-plans/push-stable-v2/.boringcache.toml .boringcache.toml
 
       - name: Run stable-v2 checks with BoringCache
         id: boringcache

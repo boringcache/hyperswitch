@@ -4,25 +4,24 @@ workspace = "boringcache/hyperswitch"
 metadata-hints = ["project=hyperswitch", "issue=14195", "workflow=ci-pr", "lane=msrv"]
 
 [entries.cargo-registry-cache]
-tag = "hyperswitch-msrv-registry-cache"
+tag = "hyperswitch-validation-v2-msrv-registry-cache"
 
 [entries.cargo-registry-index]
-tag = "hyperswitch-msrv-registry-index"
+tag = "hyperswitch-validation-v2-msrv-registry-index"
 
 [entries.cargo-git-db]
-tag = "hyperswitch-msrv-git-db"
+tag = "hyperswitch-validation-v2-msrv-git-db"
 
 [entries.cargo-target]
 kind = "cargo-target"
-tag = "hyperswitch-msrv-target"
+tag = "hyperswitch-validation-v2-msrv-target"
 
 [profiles.cargo]
 entries = ["cargo-registry-cache", "cargo-registry-index", "cargo-git-db", "cargo-target"]
 
 [adapters.cargo]
-tag = "hyperswitch-msrv-cargo"
+tag = "hyperswitch-validation-v2-msrv-cargo"
 profiles = ["cargo"]
 command = ["cargo", "check", "--features", "release"]
 compiler-cache = "none"
 fail-on-cache-error = true
-
