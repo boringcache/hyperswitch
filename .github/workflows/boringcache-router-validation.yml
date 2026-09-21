@@ -1,6 +1,12 @@
 name: BoringCache validation — Hyperswitch router build
 
 on:
+  push:
+    branches:
+      - router-cache-validation
+    paths:
+      - .github/boringcache-plans/router/.boringcache.toml
+      - .github/workflows/boringcache-router-validation.yml
   workflow_dispatch:
     inputs:
       seed_ref:
@@ -25,7 +31,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: boringcache-hyperswitch-router-${{ inputs.runner }}
+  group: boringcache-hyperswitch-router-${{ inputs.runner || 'ubuntu-24.04' }}
   cancel-in-progress: false
 
 env:
@@ -41,7 +47,7 @@ jobs:
   publish:
     name: Publish router compiler cache
     if: github.repository == 'boringcache/hyperswitch' && github.ref == 'refs/heads/router-cache-validation'
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 90
     permissions:
       contents: read
@@ -50,7 +56,7 @@ jobs:
       - name: Checkout seed source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.seed_ref }}
+          ref: ${{ inputs.seed_ref || '16edb545af7547c79f8a8d0f611ebe4c52caca6c' }}
           persist-credentials: false
 
       - name: Install mold linker
@@ -125,7 +131,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: router-publish-${{ inputs.runner }}
+          name: router-publish-${{ inputs.runner || 'ubuntu-24.04' }}
           path: |
             ${{ runner.temp }}/validation
             ${{ steps.cache.outputs.evidence-path }}
@@ -136,7 +142,7 @@ jobs:
     name: Restore router cache (${{ matrix.case }})
     needs: publish
     if: github.repository == 'boringcache/hyperswitch' && github.ref == 'refs/heads/router-cache-validation'
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 90
     permissions:
       contents: read
@@ -146,9 +152,9 @@ jobs:
       matrix:
         include:
           - case: unchanged
-            source_ref: ${{ inputs.seed_ref }}
+            source_ref: ${{ inputs.seed_ref || '16edb545af7547c79f8a8d0f611ebe4c52caca6c' }}
           - case: rolling
-            source_ref: ${{ inputs.test_ref }}
+            source_ref: ${{ inputs.test_ref || 'de8499e5e1cc3c7622ee564ac135bea398eec6dc' }}
     steps:
       - name: Checkout ${{ matrix.case }} source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -228,7 +234,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: router-${{ matrix.case }}-${{ inputs.runner }}
+          name: router-${{ matrix.case }}-${{ inputs.runner || 'ubuntu-24.04' }}
           path: |
             ${{ runner.temp }}/validation
             ${{ steps.cache.outputs.evidence-path }}
