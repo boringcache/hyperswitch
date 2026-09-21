@@ -103,7 +103,7 @@ jobs:
           sccache --version | tee "$RUNNER_TEMP/validation/sccache-version.txt"
           uname -a | tee "$RUNNER_TEMP/validation/runner.txt"
 
-      - name: Build and publish with BoringCache Cargo
+      - name: Restore and configure BoringCache Cargo
         id: cache
         uses: boringcache/one@9ca311f9b247835b3cc87639321c79bac8018145 # v1.31.0
         with:
@@ -111,6 +111,14 @@ jobs:
           mode: cargo
           diagnostics: summary
           fail-on-cache-error: true
+
+      - name: Build hyperswitch server
+        shell: bash
+        run: |
+          set -o pipefail
+          started_at=$(date +%s)
+          cargo build --package router --bin router 2>&1 | tee "$RUNNER_TEMP/validation/build.log"
+          printf '%s\n' "$(( $(date +%s) - started_at ))" > "$RUNNER_TEMP/validation/build-seconds.txt"
 
       - name: Record BoringCache metrics
         if: always()
@@ -226,7 +234,7 @@ jobs:
           sccache --version | tee "$RUNNER_TEMP/validation/sccache-version.txt"
           uname -a | tee "$RUNNER_TEMP/validation/runner.txt"
 
-      - name: Build with read-only BoringCache Cargo
+      - name: Restore and configure read-only BoringCache Cargo
         id: cache
         uses: boringcache/one@9ca311f9b247835b3cc87639321c79bac8018145 # v1.31.0
         with:
@@ -234,6 +242,14 @@ jobs:
           mode: cargo
           diagnostics: summary
           fail-on-cache-error: true
+
+      - name: Build hyperswitch server
+        shell: bash
+        run: |
+          set -o pipefail
+          started_at=$(date +%s)
+          cargo build --package router --bin router 2>&1 | tee "$RUNNER_TEMP/validation/build.log"
+          printf '%s\n' "$(( $(date +%s) - started_at ))" > "$RUNNER_TEMP/validation/build-seconds.txt"
 
       - name: Record BoringCache metrics
         if: always()
