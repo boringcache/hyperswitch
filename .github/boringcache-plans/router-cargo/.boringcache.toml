@@ -1,0 +1,35 @@
+workspace = "boringcache/hyperswitch"
+
+[proxy]
+metadata-hints = ["project=hyperswitch", "issue=14195", "workflow=router-cargo-validation"]
+
+[entries.cargo-registry-cache]
+tag = "hyperswitch-router-full-registry-cache"
+
+[entries.cargo-registry-index]
+tag = "hyperswitch-router-full-registry-index"
+
+[entries.cargo-git-db]
+tag = "hyperswitch-router-full-git-db"
+
+[entries.cargo-target]
+kind = "cargo-target"
+tag = "hyperswitch-router-full-target"
+path = "target"
+
+[profiles.cargo]
+entries = ["cargo-registry-cache", "cargo-registry-index", "cargo-git-db", "cargo-target"]
+
+[adapters.cargo]
+tag = "hyperswitch-router-full-cargo"
+profiles = ["cargo"]
+compiler-cache = "sccache"
+command = ["cargo", "build", "--package", "router", "--bin", "router"]
+metadata-hints = ["tool=runtime", "lane=build-hyperswitch-full-cargo"]
+fail-on-cache-error = true
+
+[adapters.sccache]
+tag = "hyperswitch-router-full-sccache"
+metadata-hints = ["tool=sccache", "lane=build-hyperswitch-full-cargo"]
+fail-on-cache-error = true
+

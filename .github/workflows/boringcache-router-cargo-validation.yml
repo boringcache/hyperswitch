@@ -1,0 +1,222 @@
+name: BoringCache validation — Hyperswitch full Cargo
+
+on:
+  push:
+    branches:
+      - router-cache-validation
+    paths:
+      - .github/boringcache-plans/router-cargo/.boringcache.toml
+      - .github/workflows/boringcache-router-cargo-validation.yml
+  workflow_dispatch:
+    inputs:
+      seed_ref:
+        description: Exact Hyperswitch commit used to populate all Cargo cache layers
+        type: string
+        required: true
+        default: 16edb545af7547c79f8a8d0f611ebe4c52caca6c
+      test_ref:
+        description: Exact later commit used for the rolling-source restore
+        type: string
+        required: true
+        default: de8499e5e1cc3c7622ee564ac135bea398eec6dc
+      runner:
+        description: GitHub-hosted runner architecture
+        type: choice
+        options:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+        default: ubuntu-24.04
+
+permissions:
+  contents: read
+
+concurrency:
+  group: boringcache-hyperswitch-router-cargo-${{ inputs.runner || 'ubuntu-24.04' }}
+  cancel-in-progress: false
+
+env:
+  CARGO_BUILD_JOBS: 2
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CARGO_TERM_COLOR: never
+  RUSTUP_MAX_RETRIES: 10
+  RUST_BACKTRACE: short
+  SCCACHE_IDLE_TIMEOUT: 0
+
+jobs:
+  publish:
+    name: Publish full Cargo cache
+    if: github.repository == 'boringcache/hyperswitch' && github.ref == 'refs/heads/router-cache-validation'
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout seed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.seed_ref || '16edb545af7547c79f8a8d0f611ebe4c52caca6c' }}
+          persist-credentials: false
+
+      - name: Install mold linker
+        uses: rui314/setup-mold@7e4f20ad28a2e8ca6fd0892ccf72e2abb706b9c3 # v1
+        with:
+          make-default: true
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c
+        with:
+          toolchain: stable 2 weeks ago
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3.0.0
+        with:
+          repo-token: ${{ github.token }}
+
+      - name: Install sccache
+        uses: taiki-e/install-action@fcf5432d9f50d67e37ee6e29bdb7a224ff67b4a7 # v2.62.59
+        with:
+          tool: sccache@0.17.0
+
+      - name: Checkout the BoringCache plan
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: router-cache-validation
+          path: .boringcache-validation-plan
+          sparse-checkout: .github/boringcache-plans/router-cargo/.boringcache.toml
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Select the BoringCache plan
+        run: |
+          cp .boringcache-validation-plan/.github/boringcache-plans/router-cargo/.boringcache.toml .boringcache.toml
+          printf '%s\n' '/.boringcache.toml' '/.boringcache-validation-plan/' >> .git/info/exclude
+
+      - name: Record build identity
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/validation"
+          git rev-parse HEAD | tee "$RUNNER_TEMP/validation/source-commit.txt"
+          rustc -Vv | tee "$RUNNER_TEMP/validation/rustc.txt"
+          cargo -V | tee "$RUNNER_TEMP/validation/cargo.txt"
+          sccache --version | tee "$RUNNER_TEMP/validation/sccache-version.txt"
+          uname -a | tee "$RUNNER_TEMP/validation/runner.txt"
+
+      - name: Build and publish with BoringCache Cargo
+        id: cache
+        uses: boringcache/one@1039999c65011be670f5655e0e48ad556188ab12 # v1.30.4
+        with:
+          trust-policy: publish
+          mode: cargo
+          diagnostics: summary
+          fail-on-cache-error: true
+
+      - name: Record sccache statistics
+        if: always()
+        shell: bash
+        run: sccache --show-stats --stats-format=json | tee "$RUNNER_TEMP/validation/sccache.json"
+
+      - name: Retain validation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: router-cargo-publish-${{ inputs.runner || 'ubuntu-24.04' }}
+          path: |
+            ${{ runner.temp }}/validation
+            ${{ steps.cache.outputs.evidence-path }}
+          if-no-files-found: error
+          retention-days: 30
+
+  restore:
+    name: Restore full Cargo cache (${{ matrix.case }})
+    needs: publish
+    if: github.repository == 'boringcache/hyperswitch' && github.ref == 'refs/heads/router-cache-validation'
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - case: unchanged
+            source_ref: ${{ inputs.seed_ref || '16edb545af7547c79f8a8d0f611ebe4c52caca6c' }}
+          - case: rolling
+            source_ref: ${{ inputs.test_ref || 'de8499e5e1cc3c7622ee564ac135bea398eec6dc' }}
+    steps:
+      - name: Checkout ${{ matrix.case }} source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ matrix.source_ref }}
+          persist-credentials: false
+
+      - name: Install mold linker
+        uses: rui314/setup-mold@7e4f20ad28a2e8ca6fd0892ccf72e2abb706b9c3 # v1
+        with:
+          make-default: true
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c
+        with:
+          toolchain: stable 2 weeks ago
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3.0.0
+        with:
+          repo-token: ${{ github.token }}
+
+      - name: Install sccache
+        uses: taiki-e/install-action@fcf5432d9f50d67e37ee6e29bdb7a224ff67b4a7 # v2.62.59
+        with:
+          tool: sccache@0.17.0
+
+      - name: Checkout the BoringCache plan
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: router-cache-validation
+          path: .boringcache-validation-plan
+          sparse-checkout: .github/boringcache-plans/router-cargo/.boringcache.toml
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Select the BoringCache plan
+        run: |
+          cp .boringcache-validation-plan/.github/boringcache-plans/router-cargo/.boringcache.toml .boringcache.toml
+          printf '%s\n' '/.boringcache.toml' '/.boringcache-validation-plan/' >> .git/info/exclude
+
+      - name: Record build identity
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/validation"
+          git rev-parse HEAD | tee "$RUNNER_TEMP/validation/source-commit.txt"
+          rustc -Vv | tee "$RUNNER_TEMP/validation/rustc.txt"
+          cargo -V | tee "$RUNNER_TEMP/validation/cargo.txt"
+          sccache --version | tee "$RUNNER_TEMP/validation/sccache-version.txt"
+          uname -a | tee "$RUNNER_TEMP/validation/runner.txt"
+
+      - name: Build with read-only BoringCache Cargo
+        id: cache
+        uses: boringcache/one@1039999c65011be670f5655e0e48ad556188ab12 # v1.30.4
+        with:
+          trust-policy: restore
+          mode: cargo
+          diagnostics: summary
+          fail-on-cache-error: true
+
+      - name: Record sccache statistics
+        if: always()
+        shell: bash
+        run: sccache --show-stats --stats-format=json | tee "$RUNNER_TEMP/validation/sccache.json"
+
+      - name: Retain validation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: router-cargo-${{ matrix.case }}-${{ inputs.runner || 'ubuntu-24.04' }}
+          path: |
+            ${{ runner.temp }}/validation
+            ${{ steps.cache.outputs.evidence-path }}
+          if-no-files-found: error
+          retention-days: 30
