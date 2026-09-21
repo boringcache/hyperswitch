@@ -13,12 +13,12 @@ on:
         description: Exact Hyperswitch commit used to populate all Cargo cache layers
         type: string
         required: true
-        default: 16edb545af7547c79f8a8d0f611ebe4c52caca6c
+        default: c1d7b1ee0fb2a9efcff9a5b631bf24f59f9aaa44
       test_ref:
         description: Exact later commit used for the rolling-source restore
         type: string
         required: true
-        default: de8499e5e1cc3c7622ee564ac135bea398eec6dc
+        default: 0defa221a3939d47f4e3259f4142ff8c8c42205b
       runner:
         description: GitHub-hosted runner architecture
         type: choice
@@ -56,7 +56,7 @@ jobs:
       - name: Checkout seed source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.seed_ref || '16edb545af7547c79f8a8d0f611ebe4c52caca6c' }}
+          ref: ${{ inputs.seed_ref || 'c1d7b1ee0fb2a9efcff9a5b631bf24f59f9aaa44' }}
           persist-credentials: false
 
       - name: Install mold linker
@@ -105,12 +105,42 @@ jobs:
 
       - name: Build and publish with BoringCache Cargo
         id: cache
-        uses: boringcache/one@1039999c65011be670f5655e0e48ad556188ab12 # v1.30.4
+        uses: boringcache/one@9ca311f9b247835b3cc87639321c79bac8018145 # v1.31.0
         with:
           trust-policy: publish
           mode: cargo
           diagnostics: summary
           fail-on-cache-error: true
+
+      - name: Record BoringCache metrics
+        if: always()
+        shell: bash
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+          RESTORE_DURATION_SECONDS: ${{ steps.cache.outputs.restore-duration-seconds }}
+          RESTORE_TRANSFERRED_BYTES: ${{ steps.cache.outputs.restore-transferred-bytes }}
+          PUBLISH_DURATION_SECONDS: ${{ steps.cache.outputs.publish-duration-seconds }}
+          PUBLISH_TRANSFERRED_BYTES: ${{ steps.cache.outputs.publish-transferred-bytes }}
+          PUBLISH_LOGICAL_BYTES: ${{ steps.cache.outputs.publish-logical-bytes }}
+          SNAPSHOT_DURATION_SECONDS: ${{ steps.cache.outputs.snapshot-duration-seconds }}
+        run: |
+          {
+            printf 'cache_hit=%s\n' "$CACHE_HIT"
+            printf 'restore_duration_seconds=%s\n' "$RESTORE_DURATION_SECONDS"
+            printf 'restore_transferred_bytes=%s\n' "$RESTORE_TRANSFERRED_BYTES"
+            printf 'publish_duration_seconds=%s\n' "$PUBLISH_DURATION_SECONDS"
+            printf 'publish_transferred_bytes=%s\n' "$PUBLISH_TRANSFERRED_BYTES"
+            printf 'publish_logical_bytes=%s\n' "$PUBLISH_LOGICAL_BYTES"
+            printf 'snapshot_duration_seconds=%s\n' "$SNAPSHOT_DURATION_SECONDS"
+          } | tee "$RUNNER_TEMP/validation/boringcache-metrics.txt"
+
+          for path in "$HOME/.cargo/registry/cache" "$HOME/.cargo/registry/index" "$HOME/.cargo/git/db" target; do
+            if [[ -e "$path" ]]; then
+              du -sb "$path"
+            else
+              printf 'missing\t%s\n' "$path"
+            fi
+          done | tee "$RUNNER_TEMP/validation/cache-directory-bytes.txt"
 
       - name: Record sccache statistics
         if: always()
@@ -142,9 +172,9 @@ jobs:
       matrix:
         include:
           - case: unchanged
-            source_ref: ${{ inputs.seed_ref || '16edb545af7547c79f8a8d0f611ebe4c52caca6c' }}
+            source_ref: ${{ inputs.seed_ref || 'c1d7b1ee0fb2a9efcff9a5b631bf24f59f9aaa44' }}
           - case: rolling
-            source_ref: ${{ inputs.test_ref || 'de8499e5e1cc3c7622ee564ac135bea398eec6dc' }}
+            source_ref: ${{ inputs.test_ref || '0defa221a3939d47f4e3259f4142ff8c8c42205b' }}
     steps:
       - name: Checkout ${{ matrix.case }} source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -198,12 +228,42 @@ jobs:
 
       - name: Build with read-only BoringCache Cargo
         id: cache
-        uses: boringcache/one@1039999c65011be670f5655e0e48ad556188ab12 # v1.30.4
+        uses: boringcache/one@9ca311f9b247835b3cc87639321c79bac8018145 # v1.31.0
         with:
           trust-policy: restore
           mode: cargo
           diagnostics: summary
           fail-on-cache-error: true
+
+      - name: Record BoringCache metrics
+        if: always()
+        shell: bash
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+          RESTORE_DURATION_SECONDS: ${{ steps.cache.outputs.restore-duration-seconds }}
+          RESTORE_TRANSFERRED_BYTES: ${{ steps.cache.outputs.restore-transferred-bytes }}
+          PUBLISH_DURATION_SECONDS: ${{ steps.cache.outputs.publish-duration-seconds }}
+          PUBLISH_TRANSFERRED_BYTES: ${{ steps.cache.outputs.publish-transferred-bytes }}
+          PUBLISH_LOGICAL_BYTES: ${{ steps.cache.outputs.publish-logical-bytes }}
+          SNAPSHOT_DURATION_SECONDS: ${{ steps.cache.outputs.snapshot-duration-seconds }}
+        run: |
+          {
+            printf 'cache_hit=%s\n' "$CACHE_HIT"
+            printf 'restore_duration_seconds=%s\n' "$RESTORE_DURATION_SECONDS"
+            printf 'restore_transferred_bytes=%s\n' "$RESTORE_TRANSFERRED_BYTES"
+            printf 'publish_duration_seconds=%s\n' "$PUBLISH_DURATION_SECONDS"
+            printf 'publish_transferred_bytes=%s\n' "$PUBLISH_TRANSFERRED_BYTES"
+            printf 'publish_logical_bytes=%s\n' "$PUBLISH_LOGICAL_BYTES"
+            printf 'snapshot_duration_seconds=%s\n' "$SNAPSHOT_DURATION_SECONDS"
+          } | tee "$RUNNER_TEMP/validation/boringcache-metrics.txt"
+
+          for path in "$HOME/.cargo/registry/cache" "$HOME/.cargo/registry/index" "$HOME/.cargo/git/db" target; do
+            if [[ -e "$path" ]]; then
+              du -sb "$path"
+            else
+              printf 'missing\t%s\n' "$path"
+            fi
+          done | tee "$RUNNER_TEMP/validation/cache-directory-bytes.txt"
 
       - name: Record sccache statistics
         if: always()

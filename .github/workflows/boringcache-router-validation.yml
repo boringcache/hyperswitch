@@ -13,12 +13,12 @@ on:
         description: Exact Hyperswitch commit used to populate the compiler cache
         type: string
         required: true
-        default: 16edb545af7547c79f8a8d0f611ebe4c52caca6c
+        default: c1d7b1ee0fb2a9efcff9a5b631bf24f59f9aaa44
       test_ref:
         description: Exact later commit used for the rolling-source restore
         type: string
         required: true
-        default: de8499e5e1cc3c7622ee564ac135bea398eec6dc
+        default: 0defa221a3939d47f4e3259f4142ff8c8c42205b
       runner:
         description: GitHub-hosted runner architecture
         type: choice
@@ -56,7 +56,7 @@ jobs:
       - name: Checkout seed source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.seed_ref || '16edb545af7547c79f8a8d0f611ebe4c52caca6c' }}
+          ref: ${{ inputs.seed_ref || 'c1d7b1ee0fb2a9efcff9a5b631bf24f59f9aaa44' }}
           persist-credentials: false
 
       - name: Install mold linker
@@ -105,7 +105,7 @@ jobs:
 
       - name: Configure BoringCache publishing
         id: cache
-        uses: boringcache/one@1039999c65011be670f5655e0e48ad556188ab12 # v1.30.4
+        uses: boringcache/one@9ca311f9b247835b3cc87639321c79bac8018145 # v1.31.0
         with:
           trust-policy: publish
           mode: sccache
@@ -152,9 +152,9 @@ jobs:
       matrix:
         include:
           - case: unchanged
-            source_ref: ${{ inputs.seed_ref || '16edb545af7547c79f8a8d0f611ebe4c52caca6c' }}
+            source_ref: ${{ inputs.seed_ref || 'c1d7b1ee0fb2a9efcff9a5b631bf24f59f9aaa44' }}
           - case: rolling
-            source_ref: ${{ inputs.test_ref || 'de8499e5e1cc3c7622ee564ac135bea398eec6dc' }}
+            source_ref: ${{ inputs.test_ref || '0defa221a3939d47f4e3259f4142ff8c8c42205b' }}
     steps:
       - name: Checkout ${{ matrix.case }} source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -208,7 +208,7 @@ jobs:
 
       - name: Configure read-only BoringCache
         id: cache
-        uses: boringcache/one@1039999c65011be670f5655e0e48ad556188ab12 # v1.30.4
+        uses: boringcache/one@9ca311f9b247835b3cc87639321c79bac8018145 # v1.31.0
         with:
           trust-policy: restore
           mode: sccache
