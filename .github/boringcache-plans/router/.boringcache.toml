@@ -1,0 +1,11 @@
+workspace = "boringcache/hyperswitch"
+
+[proxy]
+metadata-hints = ["project=hyperswitch", "issue=14195", "workflow=router-cache-validation"]
+
+[adapters.sccache]
+tag = "hyperswitch-router-build"
+command = ["cargo", "build", "--package", "router", "--bin", "router"]
+metadata-hints = ["tool=sccache", "lane=build-hyperswitch"]
+fail-on-cache-error = true
+
