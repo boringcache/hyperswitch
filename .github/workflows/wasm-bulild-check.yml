@@ -26,6 +26,7 @@ jobs:
       RUSTC_WRAPPER: sccache
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
       SCCACHE_CACHE_SIZE: "2G"
+      SCCACHE_IDLE_TIMEOUT: "0"
 
     steps:
       - name: Checkout repository
@@ -43,7 +44,7 @@ jobs:
           checksum: true
 
       - name: Restore sccache cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ env.SCCACHE_DIR }}
           key: sccache-local-wasm-${{ runner.os }}-${{ runner.arch }}
@@ -67,8 +68,9 @@ jobs:
         shell: bash
         run: sccache --show-stats
 
+      # !cancelled(), not always() — don't delete+save on a cancelled run.
       - name: Delete stale sccache cache entry
-        if: ${{ always() && github.event_name == 'push' }}
+        if: ${{ !cancelled() && github.event_name == 'push' }}
         continue-on-error: true
         shell: bash
         env:
@@ -76,8 +78,8 @@ jobs:
         run: gh cache delete "sccache-local-wasm-${{ runner.os }}-${{ runner.arch }}" --repo "${{ github.repository }}"
 
       - name: Save sccache cache
-        if: ${{ always() && github.event_name == 'push' }}
-        uses: actions/cache/save@v4
+        if: ${{ !cancelled() && github.event_name == 'push' }}
+        uses: actions/cache/save@v6
         with:
           path: ${{ env.SCCACHE_DIR }}
           key: sccache-local-wasm-${{ runner.os }}-${{ runner.arch }}

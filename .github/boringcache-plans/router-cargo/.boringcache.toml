@@ -1,33 +1,33 @@
 workspace = "boringcache/hyperswitch"
 
 [proxy]
-metadata-hints = ["project=hyperswitch", "issue=14195", "workflow=router-cargo-validation", "series=v131-lifecycle-20260921-main"]
+metadata-hints = ["project=hyperswitch", "issue=14195", "workflow=router-cargo-validation", "series=v132-lifecycle-20260923-main"]
 
 [entries.cargo-registry-cache]
-tag = "hyperswitch-router-v131-lifecycle-20260921-main-registry-cache"
+tag = "hyperswitch-router-v132-lifecycle-20260923-main-registry-cache"
 
 [entries.cargo-registry-index]
-tag = "hyperswitch-router-v131-lifecycle-20260921-main-registry-index"
+tag = "hyperswitch-router-v132-lifecycle-20260923-main-registry-index"
 
 [entries.cargo-git-db]
-tag = "hyperswitch-router-v131-lifecycle-20260921-main-git-db"
+tag = "hyperswitch-router-v132-lifecycle-20260923-main-git-db"
 
 [entries.cargo-target]
 kind = "cargo-target"
-tag = "hyperswitch-router-v131-lifecycle-20260921-main-target"
+tag = "hyperswitch-router-v132-lifecycle-20260923-main-target"
 path = "target"
 
 [profiles.cargo]
 entries = ["cargo-registry-cache", "cargo-registry-index", "cargo-git-db", "cargo-target"]
 
 [adapters.cargo]
-tag = "hyperswitch-router-v131-lifecycle-20260921-main-cargo"
+tag = "hyperswitch-router-v132-lifecycle-20260923-main-cargo"
 profiles = ["cargo"]
 compiler-cache = "sccache"
 metadata-hints = ["tool=runtime", "lane=build-hyperswitch-full-cargo"]
 fail-on-cache-error = true
 
 [adapters.sccache]
-tag = "hyperswitch-router-v131-lifecycle-20260921-main-sccache"
+tag = "hyperswitch-router-v132-lifecycle-20260923-main-sccache"
 metadata-hints = ["tool=sccache", "lane=build-hyperswitch-full-cargo"]
 fail-on-cache-error = true

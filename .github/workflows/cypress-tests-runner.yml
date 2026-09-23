@@ -198,12 +198,12 @@ jobs:
         if: ${{ env.RUN_TESTS == 'true' }}
         continue-on-error: true
         shell: bash
-        run: .github/scripts/sccache-restore-s3.sh build-hyperswitch
+        run: .github/scripts/sccache-restore-s3.sh build-hyperswitch "${{ github.event.pull_request.number }}"
 
       - name: Build project
         if: ${{ env.RUN_TESTS == 'true' }}
         env:
-          CARGO_BUILD_JOBS: 6
+          CARGO_BUILD_JOBS: 9
         run: cargo build --package router --bin router
 
       - name: Show sccache stats
@@ -211,12 +211,14 @@ jobs:
         shell: bash
         run: sccache --show-stats
 
-      # Only merge_group writes (this workflow has no push trigger).
+      # RUN_TESTS excludes fork PRs, so this never writes from an untrusted
+      # checkout. PR runs save PR-scoped (empty PR number on merge_group
+      # falls back to the shared job-scope key — see sccache-save-s3.sh).
       - name: Compress and upload sccache cache to S3
-        if: ${{ env.RUN_TESTS == 'true' && github.event_name == 'merge_group' }}
+        if: ${{ env.RUN_TESTS == 'true' }}
         continue-on-error: true
         shell: bash
-        run: .github/scripts/sccache-save-s3.sh build-hyperswitch
+        run: .github/scripts/sccache-save-s3.sh build-hyperswitch "${{ github.event.pull_request.number }}"
 
       # Keyed by run id so concurrent runs (different PRs) never collide.
       - name: Upload binary to S3
@@ -330,13 +332,6 @@ jobs:
         shell: bash
         run: .github/scripts/sccache-mask-s3-env.sh
 
-      - name: Install sccache
-        if: ${{ env.RUN_TESTS == 'true' }}
-        uses: taiki-e/install-action@v2
-        with:
-          tool: sccache
-          checksum: true
-
       - name: Download hyperswitch server binary from S3
         if: ${{ env.RUN_TESTS == 'true' }}
         shell: bash
@@ -383,11 +378,6 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: diesel_cli
-
-      - name: Show sccache stats
-        if: ${{ always() && env.RUN_TESTS == 'true' }}
-        shell: bash
-        run: sccache --show-stats
 
       - name: Install Just
         if: ${{ env.RUN_TESTS == 'true' }}
@@ -624,12 +614,6 @@ jobs:
         shell: bash
         run: .github/scripts/sccache-mask-s3-env.sh
 
-      - name: Install sccache
-        uses: taiki-e/install-action@v2
-        with:
-          tool: sccache
-          checksum: true
-
       - name: Download hyperswitch server binary from S3
         shell: bash
         run: .github/scripts/download-hyperswitch-binary-s3.sh
@@ -670,11 +654,6 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: diesel_cli
-
-      - name: Show sccache stats
-        if: ${{ always() && env.RUN_TESTS == 'true' }}
-        shell: bash
-        run: sccache --show-stats
 
       - name: Install Just
         uses: taiki-e/install-action@v2
@@ -913,13 +892,6 @@ jobs:
         shell: bash
         run: .github/scripts/sccache-mask-s3-env.sh
 
-      - name: Install sccache
-        if: ${{ env.RUN_TESTS == 'true' }}
-        uses: taiki-e/install-action@v2
-        with:
-          tool: sccache
-          checksum: true
-
       - name: Download hyperswitch server binary from S3
         if: ${{ env.RUN_TESTS == 'true' }}
         shell: bash
@@ -965,11 +937,6 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: diesel_cli
-
-      - name: Show sccache stats
-        if: ${{ always() && env.RUN_TESTS == 'true' }}
-        shell: bash
-        run: sccache --show-stats
 
       - name: Install Just
         if: ${{ env.RUN_TESTS == 'true' }}
@@ -1357,12 +1324,6 @@ jobs:
         shell: bash
         run: .github/scripts/sccache-mask-s3-env.sh
 
-      - name: Install sccache
-        uses: taiki-e/install-action@v2
-        with:
-          tool: sccache
-          checksum: true
-
       - name: Download hyperswitch server binary from S3
         shell: bash
         run: .github/scripts/download-hyperswitch-binary-s3.sh
@@ -1403,11 +1364,6 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: diesel_cli
-
-      - name: Show sccache stats
-        if: ${{ always() && env.RUN_TESTS == 'true' }}
-        shell: bash
-        run: sccache --show-stats
 
       - name: Install Just
         uses: taiki-e/install-action@v2
@@ -1587,23 +1543,11 @@ jobs:
           toolchain: stable 2 weeks ago
           components: rustfmt
 
-      - name: Install sccache
-        if: ${{ env.RUN_TESTS == 'true' }}
-        uses: taiki-e/install-action@v2
-        with:
-          tool: sccache
-          checksum: true
-
       - name: Install Diesel CLI
         if: ${{ env.RUN_TESTS == 'true' }}
         uses: taiki-e/install-action@v2
         with:
           tool: diesel_cli
-
-      - name: Show sccache stats
-        if: ${{ always() && env.RUN_TESTS == 'true' }}
-        shell: bash
-        run: sccache --show-stats
 
       - name: Install Just
         if: ${{ env.RUN_TESTS == 'true' }}
@@ -1858,7 +1802,7 @@ jobs:
         if: ${{ env.RUN_TESTS == 'true' }}
         continue-on-error: true
         shell: bash
-        run: .github/scripts/sccache-restore-s3.sh runner-v2
+        run: .github/scripts/sccache-restore-s3.sh runner-v2 "${{ github.event.pull_request.number }}"
 
       - name: Install Diesel CLI
         if: ${{ env.RUN_TESTS == 'true' }}
@@ -1921,7 +1865,7 @@ jobs:
         if: ${{ env.RUN_TESTS == 'true' }}
         env:
           RUSTFLAGS: "-Cinstrument-coverage"
-          CARGO_BUILD_JOBS: 6
+          CARGO_BUILD_JOBS: 9
         run: just build_v2
 
       - name: Show sccache stats
@@ -1929,12 +1873,14 @@ jobs:
         shell: bash
         run: sccache --show-stats
 
-      # Only merge_group writes (this workflow has no push trigger).
+      # RUN_TESTS excludes fork PRs, so this never writes from an untrusted
+      # checkout. PR runs save PR-scoped (empty PR number on merge_group
+      # falls back to the shared job-scope key — see sccache-save-s3.sh).
       - name: Compress and upload sccache cache to S3
-        if: ${{ env.RUN_TESTS == 'true' && github.event_name == 'merge_group' }}
+        if: ${{ env.RUN_TESTS == 'true' }}
         continue-on-error: true
         shell: bash
-        run: .github/scripts/sccache-save-s3.sh runner-v2
+        run: .github/scripts/sccache-save-s3.sh runner-v2 "${{ github.event.pull_request.number }}"
 
       - name: Setup Local Server
         if: ${{ env.RUN_TESTS == 'true' }}

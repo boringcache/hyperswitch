@@ -11270,6 +11270,20 @@
           }
         }
       },
+      "AdditionalDetails": {
+        "type": "object",
+        "description": "Additional details of a dispute, stored as jsonb",
+        "properties": {
+          "network_details": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DisputeNetworkDetails"
+              }
+            ],
+            "nullable": true
+          }
+        }
+      },
       "AdditionalMerchantData": {
         "oneOf": [
           {
@@ -12114,6 +12128,11 @@
           },
           "payment_data": {
             "$ref": "#/components/schemas/ApplePayCryptogramData"
+          },
+          "device_manufacturer_identifier": {
+            "type": "string",
+            "description": "Identifier of the device that generated the token.",
+            "nullable": true
           }
         }
       },
@@ -19664,6 +19683,7 @@
           "ctp_visa",
           "cybersource",
           "cybersourcedecisionmanager",
+          "d24",
           "datatrans",
           "deutschebank",
           "digitalvirgo",
@@ -19685,6 +19705,7 @@
           "gigadat",
           "givepayments",
           "globalpay",
+          "globalpayments_heartland",
           "globepay",
           "gocardless",
           "gotyme_sanlam",
@@ -19700,6 +19721,7 @@
           "imerchantsolutions",
           "itaubank",
           "jpmorgan",
+          "jpmorgan_orbital",
           "juspay",
           "juspaythreedsserver",
           "klarna",
@@ -19720,8 +19742,10 @@
           "nuvei",
           "opennode",
           "paybox",
+          "paydotcom",
           "payload",
           "payme",
+          "paynearme",
           "payone",
           "paypal",
           "paysafe",
@@ -19741,6 +19765,7 @@
           "recurly",
           "redsys",
           "revolv3",
+          "saferpay",
           "santander",
           "shift4",
           "silverflow",
@@ -19770,6 +19795,7 @@
           "worldpayxml",
           "worldpaymodular",
           "signifyd",
+          "nsure",
           "plaid",
           "riskified",
           "sanlam_payshield",
@@ -23021,6 +23047,37 @@
           }
         }
       },
+      "DisputeNetworkDetails": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Visa specific dispute details",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "rapid_dispute_resolution": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RapidDisputeResolution"
+                  }
+                ],
+                "nullable": true
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "visa"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Card network specific details of a dispute",
+        "discriminator": {
+          "propertyName": "type"
+        }
+      },
       "DisputeResponse": {
         "type": "object",
         "required": [
@@ -23120,6 +23177,14 @@
           "is_already_refunded": {
             "type": "boolean",
             "description": "Shows if the disputed amount(dispute_lost statuses only) + refunded amount is greater than captured amount"
+          },
+          "additional_details": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AdditionalDetails"
+              }
+            ],
+            "nullable": true
           }
         }
       },
@@ -23188,6 +23253,14 @@
             "type": "string",
             "format": "date-time",
             "description": "Time at which dispute is received"
+          },
+          "additional_details": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AdditionalDetails"
+              }
+            ],
+            "nullable": true
           }
         }
       },
@@ -24484,6 +24557,12 @@
           },
           "external_surcharge_amount": {
             "$ref": "#/components/schemas/MinorUnit"
+          },
+          "surcharge_percentage": {
+            "type": "number",
+            "format": "double",
+            "description": "Surcharge percentage returned by the connector (e.g. InterPayments), if provided.\nStored as a `Decimal` so the enclosing attempt model can keep deriving `Eq`.",
+            "nullable": true
           },
           "sale_notified": {
             "type": "boolean",
@@ -43632,6 +43711,19 @@
           "NTW_BASED_ROUTING"
         ]
       },
+      "RapidDisputeResolution": {
+        "type": "object",
+        "description": "Visa Rapid Dispute Resolution details",
+        "required": [
+          "applied"
+        ],
+        "properties": {
+          "applied": {
+            "type": "boolean",
+            "description": "Whether Rapid Dispute Resolution has been applied"
+          }
+        }
+      },
       "RealTimePaymentData": {
         "oneOf": [
           {
@@ -45102,6 +45194,13 @@
               }
             ],
             "nullable": true
+          },
+          "surcharge_percentage": {
+            "type": "number",
+            "format": "double",
+            "description": "The surcharge percentage returned by the surcharge connector (e.g. InterPayments), if\navailable. Present only on responses when an external surcharge connector supplied it;\nignored on requests.",
+            "example": 3.25,
+            "nullable": true
           }
         }
       },
@@ -45645,6 +45744,7 @@
           "cryptopay",
           "cybersource",
           "cybersourcedecisionmanager",
+          "d24",
           "datatrans",
           "deutschebank",
           "digitalvirgo",
@@ -45666,6 +45766,7 @@
           "gigadat",
           "givepayments",
           "globalpay",
+          "globalpayments_heartland",
           "globepay",
           "gocardless",
           "gotyme_sanlam",
@@ -45679,6 +45780,7 @@
           "interpayments",
           "itaubank",
           "jpmorgan",
+          "jpmorgan_orbital",
           "klarna",
           "loonio",
           "merchante",
@@ -45696,7 +45798,9 @@
           "nuvei",
           "opennode",
           "paybox",
+          "paydotcom",
           "payme",
+          "paynearme",
           "payload",
           "payone",
           "paypal",
@@ -45718,10 +45822,12 @@
           "redsys",
           "revolv3",
           "riskified",
+          "saferpay",
           "sanlam_payshield",
           "santander",
           "shift4",
           "signifyd",
+          "nsure",
           "silverflow",
           "square",
           "stax",

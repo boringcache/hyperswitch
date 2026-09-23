@@ -13,12 +13,12 @@ on:
         description: Exact Hyperswitch commit used to populate all Cargo cache layers
         type: string
         required: true
-        default: c1d7b1ee0fb2a9efcff9a5b631bf24f59f9aaa44
+        default: f46bd9901f3731999b26e5ac876f31524184e32e
       test_ref:
         description: Exact later commit used for the rolling-source restore
         type: string
         required: true
-        default: 0defa221a3939d47f4e3259f4142ff8c8c42205b
+        default: eee4abac0d739da8b84111d36ad867bf34a6c905
       runner:
         description: GitHub-hosted runner architecture
         type: choice
@@ -56,7 +56,7 @@ jobs:
       - name: Checkout seed source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.seed_ref || 'c1d7b1ee0fb2a9efcff9a5b631bf24f59f9aaa44' }}
+          ref: ${{ inputs.seed_ref || 'f46bd9901f3731999b26e5ac876f31524184e32e' }}
           persist-credentials: false
 
       - name: Install mold linker
@@ -105,7 +105,7 @@ jobs:
 
       - name: Restore and configure BoringCache Cargo
         id: cache
-        uses: boringcache/one@9ca311f9b247835b3cc87639321c79bac8018145 # v1.31.0
+        uses: boringcache/one@476c7df90bc1e7c2c4066aa7eb31cc057ef7f8d1 # v1.32.0
         with:
           trust-policy: publish
           mode: cargo
@@ -180,9 +180,9 @@ jobs:
       matrix:
         include:
           - case: unchanged
-            source_ref: ${{ inputs.seed_ref || 'c1d7b1ee0fb2a9efcff9a5b631bf24f59f9aaa44' }}
+            source_ref: ${{ inputs.seed_ref || 'f46bd9901f3731999b26e5ac876f31524184e32e' }}
           - case: rolling
-            source_ref: ${{ inputs.test_ref || '0defa221a3939d47f4e3259f4142ff8c8c42205b' }}
+            source_ref: ${{ inputs.test_ref || 'eee4abac0d739da8b84111d36ad867bf34a6c905' }}
     steps:
       - name: Checkout ${{ matrix.case }} source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -236,7 +236,7 @@ jobs:
 
       - name: Restore and configure read-only BoringCache Cargo
         id: cache
-        uses: boringcache/one@9ca311f9b247835b3cc87639321c79bac8018145 # v1.31.0
+        uses: boringcache/one@476c7df90bc1e7c2c4066aa7eb31cc057ef7f8d1 # v1.32.0
         with:
           trust-policy: restore
           mode: cargo
